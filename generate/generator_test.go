@@ -2,6 +2,7 @@ package generate
 
 import (
 	"os"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -69,6 +70,8 @@ func Test_generate_ts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error reading TS file: %v", err)
 	}
+
+	sort.Sort(rpcs)
 
 	ts_result, err := generate_ts(rpcs)
 	if err != nil {

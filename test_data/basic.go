@@ -25,6 +25,17 @@ type Zwei_Response struct {
 	ResponseString string `json:"responseString" validate:"required" ark:"string > 0"`
 }
 
+const A_Path = "/a-brauche-einen-langen-text"
+
+type (
+	A_Request struct {
+		Msg string `json:"msg" ark:"string > 0"`
+	}
+	A_Response struct {
+		Msg string `json:"msg" ark:"string > 0"`
+	}
+)
+
 func IgnoreMe() {
 	//
 }

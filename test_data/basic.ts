@@ -1,5 +1,15 @@
 import { type } from "arktype";
 
+export const A_Request_Schema = type({
+  msg: "string > 0",
+});
+export type A_Request = typeof A_Request_Schema.infer;
+
+export const A_Response_Schema = type({
+  msg: "string > 0",
+});
+export type A_Response = typeof A_Response_Schema.infer;
+
 export const Eins_Request_Schema = type({
   requiredString: "string > 0",
   optionalString: "string | undefined",
@@ -65,6 +75,9 @@ export class RPC_Client {
       };
     }
   }
+
+  a = (args: A_Request) =>
+    this.#call<A_Request, A_Response>("/a-brauche-einen-langen-text", args);
 
   eins = (args: Eins_Request) =>
     this.#call<Eins_Request, Eins_Response>("/eins", args);

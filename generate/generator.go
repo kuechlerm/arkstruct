@@ -7,6 +7,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/fatih/structtag"
@@ -29,13 +30,27 @@ type RPC struct {
 	response Schema
 }
 
+type RPCs []RPC
+
+func (r RPCs) Len() int {
+	return len(r)
+}
+
+func (r RPCs) Less(i, j int) bool {
+	return r[i].request.Name < r[j].request.Name
+}
+
+func (r RPCs) Swap(i, j int) {
+	r[i], r[j] = r[j], r[i]
+}
+
 func Generate(go_folder_path, target_path string) error {
 	folder, err := os.ReadDir(go_folder_path)
 	if err != nil {
 		return errors.New("Error reading folder: " + err.Error())
 	}
 
-	all_rpcs := []RPC{}
+	all_rpcs := RPCs{}
 	for _, file := range folder {
 		if file.IsDir() || !strings.HasSuffix(file.Name(), ".go") {
 			continue // no directories, only go files
@@ -55,6 +70,8 @@ func Generate(go_folder_path, target_path string) error {
 
 		all_rpcs = append(all_rpcs, rpcs...)
 	}
+
+	sort.Sort(all_rpcs)
 
 	ts_code, err := generate_ts(all_rpcs)
 	if err != nil {
@@ -157,7 +174,7 @@ func generate_ts(rpcs []RPC) (string, error) {
 	return ts_code.String(), nil
 }
 
-func get_rpcs(file_content string) ([]RPC, error) {
+func get_rpcs(file_content string) (RPCs, error) {
 	rpcs := []RPC{}
 
 	fset := token.NewFileSet()
