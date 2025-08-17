@@ -1,14 +1,14 @@
 import { type } from "arktype";
 
-export const A_Request_Schema = type({
+export const A_Name_Request_Schema = type({
   msg: "string > 0",
 });
-export type A_Request = typeof A_Request_Schema.infer;
+export type A_Name_Request = typeof A_Name_Request_Schema.infer;
 
-export const A_Response_Schema = type({
+export const A_Name_Response_Schema = type({
   msg: "string > 0",
 });
-export type A_Response = typeof A_Response_Schema.infer;
+export type A_Name_Response = typeof A_Name_Response_Schema.infer;
 
 export const Eins_Request_Schema = type({
   requiredString: "string > 0",
@@ -76,8 +76,8 @@ export class RPC_Client {
     }
   }
 
-  a = (args: A_Request) =>
-    this.#call<A_Request, A_Response>("/a-brauche-einen-langen-text", args);
+  a_name = (args: A_Name_Request) =>
+    this.#call<A_Name_Request, A_Name_Response>("/a_name", args);
 
   eins = (args: Eins_Request) =>
     this.#call<Eins_Request, Eins_Response>("/eins", args);

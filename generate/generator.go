@@ -155,7 +155,7 @@ func generate_ts(rpcs []RPC) (string, error) {
 	for idx, rpc := range rpcs {
 		ts_code.WriteString(
 			"  " +
-				strings.ToLower(strings.Split(rpc.request.Name, "_")[0]) +
+				strings.ToLower(rpc.request.Name[:strings.LastIndex(rpc.request.Name, "_")]) +
 				" = (args: " + rpc.request.Name + ") =>\n")
 		ts_code.WriteString(
 			"    this.#call<" +

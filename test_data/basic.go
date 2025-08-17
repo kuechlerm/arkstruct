@@ -25,13 +25,13 @@ type Zwei_Response struct {
 	ResponseString string `json:"responseString" validate:"required" ark:"string > 0"`
 }
 
-const A_Path = "/a-brauche-einen-langen-text"
+const A_Name_Path = "/a_name"
 
 type (
-	A_Request struct {
+	A_Name_Request struct {
 		Msg string `json:"msg" ark:"string > 0"`
 	}
-	A_Response struct {
+	A_Name_Response struct {
 		Msg string `json:"msg" ark:"string > 0"`
 	}
 )
