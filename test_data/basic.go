@@ -36,6 +36,19 @@ type (
 	}
 )
 
+const Listen_Path = "/listen"
+
+type (
+	Ding_DTO struct {
+		ID   int    `json:"id" ark:"number"`
+		Name string `json:"name" ark:"string > 0"`
+	}
+	Listen_Request  struct{}
+	Listen_Response struct {
+		Dinge []Ding_DTO `json:"dinge" ark:"type:Ding_DTO_Schema.array()"`
+	}
+)
+
 func IgnoreMe() {
 	//
 }

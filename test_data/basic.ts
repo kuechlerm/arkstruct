@@ -1,5 +1,11 @@
 import { type } from "arktype";
 
+export const Ding_DTO_Schema = type({
+  id: "number",
+  name: "string > 0",
+});
+export type Ding_DTO = typeof Ding_DTO_Schema.infer;
+
 export const A_Name_Request_Schema = type({
   msg: "string > 0",
 });
@@ -24,6 +30,14 @@ export const Eins_Response_Schema = type({
   responseString: "string > 0",
 });
 export type Eins_Response = typeof Eins_Response_Schema.infer;
+
+export const Listen_Request_Schema = type({});
+export type Listen_Request = typeof Listen_Request_Schema.infer;
+
+export const Listen_Response_Schema = type({
+  dinge: Ding_DTO_Schema.array(),
+});
+export type Listen_Response = typeof Listen_Response_Schema.infer;
 
 export const Zwei_Request_Schema = type({
   optionalString: "string | undefined",
@@ -81,6 +95,9 @@ export class RPC_Client {
 
   eins = (args: Eins_Request) =>
     this.#call<Eins_Request, Eins_Response>("/eins", args);
+
+  listen = (args: Listen_Request) =>
+    this.#call<Listen_Request, Listen_Response>("/listen", args);
 
   zwei = (args: Zwei_Request) =>
     this.#call<Zwei_Request, Zwei_Response>("/zwei", args);

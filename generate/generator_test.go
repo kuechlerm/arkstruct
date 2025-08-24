@@ -61,7 +61,7 @@ func Test_generate_ts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error reading Go file: %v", err)
 	}
-	rpcs, err := get_rpcs(string(go_content))
+	dtos, rpcs, err := get_infos(string(go_content))
 	if err != nil {
 		t.Fatalf("Error getting RPCs: %v", err)
 	}
@@ -73,7 +73,7 @@ func Test_generate_ts(t *testing.T) {
 
 	sort.Sort(rpcs)
 
-	ts_result, err := generate_ts(rpcs)
+	ts_result, err := generate_ts(dtos, rpcs)
 	if err != nil {
 		t.Fatalf("Error generating TS: %v", err)
 	}
@@ -81,6 +81,10 @@ func Test_generate_ts(t *testing.T) {
 	// compare line by line
 	expected_ts_lines := strings.Split(string(expected_ts_content), "\n")
 	ts_result_lines := strings.Split(ts_result, "\n")
+
+	// for _, line := range ts_result_lines {
+	// 	fmt.Println(">" + line)
+	// }
 
 	for i, expected_line := range expected_ts_lines {
 

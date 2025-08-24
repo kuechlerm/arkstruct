@@ -30,6 +30,21 @@ type RPC struct {
 	response Schema
 }
 
+// Ein freies Schema ist ein DTO
+type DTOs []Schema
+
+func (d DTOs) Len() int {
+	return len(d)
+}
+
+func (d DTOs) Less(i, j int) bool {
+	return d[i].Name < d[j].Name
+}
+
+func (d DTOs) Swap(i, j int) {
+	d[i], d[j] = d[j], d[i]
+}
+
 type RPCs []RPC
 
 func (r RPCs) Len() int {
@@ -50,6 +65,7 @@ func Generate(go_folder_path, target_path string) error {
 		return errors.New("Error reading folder: " + err.Error())
 	}
 
+	all_dtos := DTOs{}
 	all_rpcs := RPCs{}
 	for _, file := range folder {
 		if file.IsDir() || !strings.HasSuffix(file.Name(), ".go") {
@@ -63,17 +79,19 @@ func Generate(go_folder_path, target_path string) error {
 			return errors.New("Error reading Go file: " + err.Error())
 		}
 
-		rpcs, err := get_rpcs(string(content))
+		dtos, rpcs, err := get_infos(string(content))
 		if err != nil {
 			return errors.New("Error getting RPCs: " + err.Error())
 		}
 
+		all_dtos = append(all_dtos, dtos...)
 		all_rpcs = append(all_rpcs, rpcs...)
 	}
 
+	sort.Sort(all_dtos)
 	sort.Sort(all_rpcs)
 
-	ts_code, err := generate_ts(all_rpcs)
+	ts_code, err := generate_ts(all_dtos, all_rpcs)
 	if err != nil {
 		return errors.New("Error generating TypeScript code: " + err.Error())
 	}
@@ -86,33 +104,18 @@ func Generate(go_folder_path, target_path string) error {
 	return nil
 }
 
-func generate_ts(rpcs []RPC) (string, error) {
-	var ts_code strings.Builder
+func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
+	ts_code := &strings.Builder{}
 	ts_code.WriteString(`import { type } from "arktype";`)
 	ts_code.WriteString("\n\n")
 
+	for _, dto := range dtos {
+		write_schema(ts_code, dto)
+	}
+
 	for _, rpc := range rpcs {
-		// generate request schema
-		ts_code.WriteString(fmt.Sprintf("export const %s_Schema = type({\n", rpc.request.Name))
-		for _, prop := range rpc.request.Properties {
-			ts_code.WriteString(fmt.Sprintf(`  %s: "%s",`, prop.Name, prop.Type))
-			ts_code.WriteString("\n")
-		}
-		ts_code.WriteString("});\n")
-
-		// generate request type
-		ts_code.WriteString(fmt.Sprintf("export type %s = typeof %s_Schema.infer;\n\n", rpc.request.Name, rpc.request.Name))
-
-		// generate response schema
-		ts_code.WriteString(fmt.Sprintf("export const %s_Schema = type({\n", rpc.response.Name))
-		for _, prop := range rpc.response.Properties {
-			ts_code.WriteString(fmt.Sprintf(`  %s: "%s",`, prop.Name, prop.Type))
-			ts_code.WriteString("\n")
-		}
-		ts_code.WriteString("});\n")
-
-		// generate response type
-		ts_code.WriteString(fmt.Sprintf("export type %s = typeof %s_Schema.infer;\n\n", rpc.response.Name, rpc.response.Name))
+		write_schema(ts_code, rpc.request)
+		write_schema(ts_code, rpc.response)
 	}
 
 	// rpc client class
@@ -174,13 +177,33 @@ func generate_ts(rpcs []RPC) (string, error) {
 	return ts_code.String(), nil
 }
 
-func get_rpcs(file_content string) (RPCs, error) {
-	rpcs := []RPC{}
+func write_schema(ts_code *strings.Builder, schema Schema) {
+	fmt.Fprintf(ts_code, "export const %s_Schema = type({", schema.Name)
+
+	for idx, prop := range schema.Properties {
+		if idx == 0 {
+			ts_code.WriteString("\n")
+		}
+		if strings.HasPrefix(prop.Type, "type:") {
+			fmt.Fprintf(ts_code, `  %s: %s,`, prop.Name, strings.TrimLeft(prop.Type, "type:"))
+		} else {
+			fmt.Fprintf(ts_code, `  %s: "%s",`, prop.Name, prop.Type)
+		}
+		ts_code.WriteString("\n")
+	}
+	ts_code.WriteString("});\n")
+
+	fmt.Fprintf(ts_code, "export type %s = typeof %s_Schema.infer;\n\n", schema.Name, schema.Name)
+}
+
+func get_infos(file_content string) (DTOs, RPCs, error) {
+	dtos := DTOs{}
+	rpcs := RPCs{}
 
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, "", file_content, parser.AllErrors)
 	if err != nil {
-		return rpcs, errors.New("Error parsing Go file: " + err.Error())
+		return dtos, rpcs, errors.New("Error parsing Go file: " + err.Error())
 	}
 
 	rpc_name_map := map[string]RPC{}
@@ -221,7 +244,7 @@ func get_rpcs(file_content string) (RPCs, error) {
 			}
 
 			type_spec, ok := spec.(*ast.TypeSpec)
-			if !ok || (!strings.HasSuffix(type_spec.Name.Name, "_Request") && !strings.HasSuffix(type_spec.Name.Name, "_Response")) {
+			if !ok || (!strings.HasSuffix(type_spec.Name.Name, "_DTO") && !strings.HasSuffix(type_spec.Name.Name, "_Request") && !strings.HasSuffix(type_spec.Name.Name, "_Response")) {
 				continue
 			}
 			spec_name := type_spec.Name.Name[:strings.LastIndex(type_spec.Name.Name, "_")]
@@ -230,17 +253,22 @@ func get_rpcs(file_content string) (RPCs, error) {
 			}
 
 			if _, ok := type_spec.Type.(*ast.StructType); ok {
-				call := rpc_name_map[spec_name]
+				if strings.HasSuffix(type_spec.Name.Name, "_DTO") {
+					dtos = append(dtos, map_schema(type_spec))
+				} else {
 
-				if strings.HasSuffix(type_spec.Name.Name, "_Request") {
-					call.request = map_schema(type_spec)
+					call := rpc_name_map[spec_name]
+
+					if strings.HasSuffix(type_spec.Name.Name, "_Request") {
+						call.request = map_schema(type_spec)
+					}
+
+					if strings.HasSuffix(type_spec.Name.Name, "_Response") {
+						call.response = map_schema(type_spec)
+					}
+
+					rpc_name_map[spec_name] = call
 				}
-
-				if strings.HasSuffix(type_spec.Name.Name, "_Response") {
-					call.response = map_schema(type_spec)
-				}
-
-				rpc_name_map[spec_name] = call
 			}
 		}
 	}
@@ -249,7 +277,7 @@ func get_rpcs(file_content string) (RPCs, error) {
 		rpcs = append(rpcs, call)
 	}
 
-	return rpcs, nil
+	return dtos, rpcs, nil
 }
 
 func map_schema(typeSpec *ast.TypeSpec) Schema {
