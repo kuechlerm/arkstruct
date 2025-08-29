@@ -50,17 +50,22 @@ export const Zwei_Response_Schema = type({
 export type Zwei_Response = typeof Zwei_Response_Schema.infer;
 
 export class RPC_Client {
-  constructor(public base_url: string) {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructor(private base_url: string, private override_call?:(path:string, args:any)=> Promise<any>) {}
 
   async #call<TRequest, TResponse>(
     path: string,
     args: TRequest,
-  ): Promise<
-    { value: TResponse; error: null } | { value: null; error: string }
-  > {
+  ): Promise<{ value: TResponse; error: null } | { value: null; error: string }> {
+
+    if(this.override_call) return await this.override_call(path, args);
+
     try {
       const result = await fetch(new URL(path, this.base_url).href, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(args),
       });
 
