@@ -25,6 +25,7 @@ type Schema struct {
 }
 
 type RPC struct {
+	name     string
 	path     string
 	request  Schema
 	response Schema
@@ -114,19 +115,27 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 	}
 
 	for _, rpc := range rpcs {
+		write_path(ts_code, rpc.name, rpc.path)
 		write_schema(ts_code, rpc.request)
 		write_schema(ts_code, rpc.response)
 	}
 
 	// rpc client class
 	ts_code.WriteString("export class RPC_Client {\n")
-	ts_code.WriteString("  // eslint-disable-next-line @typescript-eslint/no-explicit-any\n")
-	ts_code.WriteString("  constructor(private base_url: string, private override_call?:(path:string, args:any)=> Promise<any>) {}\n\n")
+	ts_code.WriteString("  constructor(\n")
+	ts_code.WriteString("    private base_url: string,\n")
+	ts_code.WriteString("    private options?: {\n")
+	ts_code.WriteString("      // eslint-disable-next-line @typescript-eslint/no-explicit-any\n")
+	ts_code.WriteString("      override_call?: (path: string, args: any) => Promise<any>;\n")
+	ts_code.WriteString("      handle_error?: (response: Response) => void;\n")
+	ts_code.WriteString("    },\n")
+	ts_code.WriteString("  ) {}\n\n")
+
 	ts_code.WriteString("  async #call<TRequest, TResponse>(\n")
 	ts_code.WriteString("    path: string,\n")
 	ts_code.WriteString("    args: TRequest,\n")
 	ts_code.WriteString("  ): Promise<{ value: TResponse; error: null } | { value: null; error: string }> {\n\n")
-	ts_code.WriteString("    if(this.override_call) return await this.override_call(path, args);\n\n")
+	ts_code.WriteString("    if (this.options?.override_call) return await this.options.override_call(path, args);\n\n")
 	ts_code.WriteString("    try {\n")
 	ts_code.WriteString("      const result = await fetch(new URL(path, this.base_url).href, {\n")
 	ts_code.WriteString("        method: \"POST\",\n")
@@ -136,12 +145,11 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 	ts_code.WriteString("        body: JSON.stringify(args),\n")
 	ts_code.WriteString("      });\n\n")
 	ts_code.WriteString("      if (!result.ok) {\n")
-	ts_code.WriteString("        console.error(\n")
-	ts_code.WriteString("          `Fetch error: ${result.status} ${result.statusText} for ${path}`,\n")
-	ts_code.WriteString("        );\n")
+	ts_code.WriteString("        console.error(`Fetch error: ${result.status} ${result.statusText} for ${path}`);\n")
+	ts_code.WriteString("        if (this.options?.handle_error) this.options.handle_error(result);\n")
 	ts_code.WriteString("        return {\n")
 	ts_code.WriteString("          value: null,\n")
-	ts_code.WriteString("          error: `Fetch error: ${result.status} ${result.statusText}`,\n")
+	ts_code.WriteString("          error: (await result.json())?.message ?? 'Unknown error',\n")
 	ts_code.WriteString("        };\n")
 	ts_code.WriteString("      }\n\n")
 	ts_code.WriteString("      const data = await result.json();\n\n")
@@ -168,7 +176,7 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 				rpc.request.Name +
 				", " +
 				rpc.response.Name +
-				">(\"" + rpc.path + "\", args);\n")
+				">(" + rpc.name + "_Path, args);\n")
 
 		if idx < len(rpcs)-1 {
 			ts_code.WriteString("\n")
@@ -178,6 +186,10 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 	ts_code.WriteString("}\n")
 
 	return ts_code.String(), nil
+}
+
+func write_path(ts_code *strings.Builder, name string, path string) {
+	fmt.Fprintf(ts_code, "export const %s_Path = \"%s\";\n", name, path)
 }
 
 func write_schema(ts_code *strings.Builder, schema Schema) {
@@ -261,6 +273,7 @@ func get_infos(file_content string) (DTOs, RPCs, error) {
 				} else {
 
 					call := rpc_name_map[spec_name]
+					call.name = spec_name
 
 					if strings.HasSuffix(type_spec.Name.Name, "_Request") {
 						call.request = map_schema(type_spec)
