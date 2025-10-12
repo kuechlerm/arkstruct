@@ -1,5 +1,16 @@
 package test_data
 
+const A_Name_Path = "/a_name"
+
+type (
+	A_Name_Request struct {
+		Msg string `json:"msg" ark:"string > 0"`
+	}
+	A_Name_Response struct {
+		Msg string `json:"msg" ark:"string > 0"`
+	}
+)
+
 const Eins_Path = "/eins"
 
 type Eins_Request struct {
@@ -15,28 +26,10 @@ type Eins_Response struct {
 	ResponseString string `json:"responseString" validate:"required" ark:"string > 0"`
 }
 
-const Zwei_Path = "/zwei"
-
-type Zwei_Request struct {
-	OptionalString string `json:"optionalString" ark:"string | undefined"`
-}
-
-type Zwei_Response struct {
-	ResponseString string `json:"responseString" validate:"required" ark:"string > 0"`
-}
-
-const A_Name_Path = "/a_name"
-
-type (
-	A_Name_Request struct {
-		Msg string `json:"msg" ark:"string > 0"`
-	}
-	A_Name_Response struct {
-		Msg string `json:"msg" ark:"string > 0"`
-	}
+const (
+	Listen_Path = "/listen"
+	Zwei_Path   = "/zwei"
 )
-
-const Listen_Path = "/listen"
 
 type (
 	Ding_DTO struct {
@@ -48,6 +41,14 @@ type (
 		Dinge []Ding_DTO `json:"dinge" ark:"type:Ding_DTO_Schema.array()"`
 	}
 )
+
+type Zwei_Request struct {
+	OptionalString string `json:"optionalString" ark:"string | undefined"`
+}
+
+type Zwei_Response struct {
+	ResponseString string `json:"responseString" validate:"required" ark:"string > 0"`
+}
 
 // werden ignoriert, da kein Path
 type (

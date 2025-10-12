@@ -7,7 +7,6 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/fatih/structtag"
@@ -32,33 +31,10 @@ type RPC struct {
 }
 
 // Ein freies Schema ist ein DTO
-type DTOs []Schema
-
-func (d DTOs) Len() int {
-	return len(d)
-}
-
-func (d DTOs) Less(i, j int) bool {
-	return d[i].Name < d[j].Name
-}
-
-func (d DTOs) Swap(i, j int) {
-	d[i], d[j] = d[j], d[i]
-}
-
-type RPCs []RPC
-
-func (r RPCs) Len() int {
-	return len(r)
-}
-
-func (r RPCs) Less(i, j int) bool {
-	return r[i].request.Name < r[j].request.Name
-}
-
-func (r RPCs) Swap(i, j int) {
-	r[i], r[j] = r[j], r[i]
-}
+type (
+	DTOs []Schema
+	RPCs []RPC
+)
 
 func Generate(go_folder_path, target_path string) error {
 	folder, err := os.ReadDir(go_folder_path)
@@ -88,9 +64,6 @@ func Generate(go_folder_path, target_path string) error {
 		all_dtos = append(all_dtos, dtos...)
 		all_rpcs = append(all_rpcs, rpcs...)
 	}
-
-	sort.Sort(all_dtos)
-	sort.Sort(all_rpcs)
 
 	ts_code, err := generate_ts(all_dtos, all_rpcs)
 	if err != nil {
