@@ -167,10 +167,16 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 	ts_code.WriteString("  }\n\n")
 
 	for idx, rpc := range rpcs {
+		trenner_index := strings.LastIndex(rpc.request.Name, "_")
+		if trenner_index == -1 {
+			continue
+		}
+
 		ts_code.WriteString(
 			"  " +
-				strings.ToLower(rpc.request.Name[:strings.LastIndex(rpc.request.Name, "_")]) +
+				strings.ToLower(rpc.request.Name[:trenner_index]) +
 				" = (args: " + rpc.request.Name + ") =>\n")
+
 		ts_code.WriteString(
 			"    this.#call<" +
 				rpc.request.Name +
@@ -236,23 +242,30 @@ func get_infos(file_content string) (DTOs, RPCs, error) {
 			const_spec, ok := spec.(*ast.ValueSpec)
 
 			if ok {
-				// todo: check für Names[0]?
+				// todo: check / Fehler loggen?
 				const_name := const_spec.Names[0].Name
 
 				// Wir suchen nach Konstanten, die mit "_Path" enden
+				// todo: check / Fehler loggen?
 				literal, ok := const_spec.Values[0].(*ast.BasicLit)
 				if !ok || literal.Kind != token.STRING || !strings.HasSuffix(const_name, "_Path") {
 					continue
 				}
 
 				// muss gleich specName sein, damit Zuordnung stimmt
-				const_spec_name := const_name[:strings.LastIndex(const_name, "_")]
+				trenner_index := strings.LastIndex(const_name, "_")
+				if trenner_index == -1 {
+					continue
+				}
+				const_spec_name := const_name[:trenner_index]
 				if const_spec_name == "" {
 					continue
 				}
 
+				// todo: check / Fehler loggen?
 				rpc := rpc_name_map[const_spec_name]
 				rpc.path = strings.Trim(literal.Value, "\"")
+				// todo: check / Fehler loggen?
 				rpc_name_map[const_spec_name] = rpc
 
 				continue
@@ -262,7 +275,11 @@ func get_infos(file_content string) (DTOs, RPCs, error) {
 			if !ok || (!strings.HasSuffix(type_spec.Name.Name, "_DTO") && !strings.HasSuffix(type_spec.Name.Name, "_Request") && !strings.HasSuffix(type_spec.Name.Name, "_Response")) {
 				continue
 			}
-			spec_name := type_spec.Name.Name[:strings.LastIndex(type_spec.Name.Name, "_")]
+			trenner_index := strings.LastIndex(type_spec.Name.Name, "_")
+			if trenner_index == -1 {
+				continue
+			}
+			spec_name := type_spec.Name.Name[:trenner_index]
 			if spec_name == "" {
 				continue
 			}
@@ -272,6 +289,9 @@ func get_infos(file_content string) (DTOs, RPCs, error) {
 					dtos = append(dtos, map_schema(type_spec))
 				} else {
 
+					// check, ob Path für diesen Request/Response existiert findet am Ende statt
+
+					// todo: check / Fehler loggen?
 					call := rpc_name_map[spec_name]
 					call.name = spec_name
 
@@ -283,6 +303,7 @@ func get_infos(file_content string) (DTOs, RPCs, error) {
 						call.response = map_schema(type_spec)
 					}
 
+					// todo: check / Fehler loggen?
 					rpc_name_map[spec_name] = call
 				}
 			}
@@ -290,6 +311,11 @@ func get_infos(file_content string) (DTOs, RPCs, error) {
 	}
 
 	for _, call := range rpc_name_map {
+		// check, ob path, request und response gesetzt sind
+		if call.name == "" || call.path == "" || call.request.Name == "" || call.response.Name == "" {
+			fmt.Printf("Ignoring incomplete RPC definition: %+v\n", call)
+			continue
+		}
 		rpcs = append(rpcs, call)
 	}
 
@@ -347,6 +373,7 @@ func map_schema(typeSpec *ast.TypeSpec) Schema {
 			// }
 		}
 
+		// todo: check / Fehler loggen?
 		name := field.Names[0].Name
 		if json_property_name != "" {
 			name = json_property_name // wenn json-Name vorhanden, dann diesen verwenden

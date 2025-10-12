@@ -49,6 +49,17 @@ type (
 	}
 )
 
+// werden ignoriert, da kein Path
+type (
+	Request_ohne_Path_Request  struct{}
+	Request_ohne_Path_Response struct{}
+)
+
+// wird ignoriert, da kein Request
+const Path_ohne_Request_Path = "/ohne_request"
+
+type Path_ohne_Request_Response struct{}
+
 func IgnoreMe() {
 	//
 }
