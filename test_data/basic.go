@@ -36,6 +36,9 @@ type (
 		ID   int    `json:"id" ark:"number"`
 		Name string `json:"name" ark:"string > 0"`
 	}
+	// Ding_DTO struct {
+	// 	Ding
+	// }
 	Listen_Request  struct{}
 	Listen_Response struct {
 		Dinge []Ding_DTO `json:"dinge" ark:"type:Ding_DTO_Schema.array()"`

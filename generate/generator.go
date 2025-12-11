@@ -70,7 +70,7 @@ func Generate(go_folder_path, target_path string) error {
 		return errors.New("Error generating TypeScript code: " + err.Error())
 	}
 
-	err = os.WriteFile(target_path, []byte(ts_code), 0644)
+	err = os.WriteFile(target_path, []byte(ts_code), 0o644)
 	if err != nil {
 		return errors.New("Error writing TypeScript file: " + err.Error())
 	}
@@ -131,7 +131,8 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 	ts_code.WriteString("        error: null,\n")
 	ts_code.WriteString("      };\n")
 	ts_code.WriteString("    } catch (error) {\n")
-	ts_code.WriteString("      console.error(`Error during fetch for ${path}:`, error);\n\n")
+	ts_code.WriteString("      console.error('RPC_Client Error for', { path, args: JSON.stringify(args) });\n")
+	ts_code.WriteString("      console.error(error);\n\n")
 	ts_code.WriteString("      return {\n")
 	ts_code.WriteString("        value: null,\n")
 	ts_code.WriteString("        error: error instanceof Error ? error.message : \"Unknown error\",\n")
@@ -299,6 +300,24 @@ func map_schema(typeSpec *ast.TypeSpec) Schema {
 	properties := []Property{}
 
 	for _, field := range typeSpec.Type.(*ast.StructType).Fields.List {
+		// if typeSpec.Name.Name == "Ding_DTO" {
+		// 	fmt.Printf("Processing field: %+v\n", field)
+		// }
+
+		// todo: fix?
+		// if field.Names == nil {
+		// 	// This is an embedded field!
+		// 	// field.Type will be the embedded type (e.g., *ast.Ident or *ast.SelectorExpr)
+		// 	fmt.Printf("Ignoring embedded field in type %s\n", typeSpec.Name.Name)
+		// 	switch t := field.Type.(type) {
+		// 	case *ast.Ident:
+		// 		println("Embedded:", t.Name)
+		// 	case *ast.SelectorExpr:
+		// 		// For imported embedded types
+		// 		println("Embedded:", t.X.(*ast.Ident).Name+"."+t.Sel.Name)
+		// 	}
+		// 	continue
+		// }
 
 		// ##### Type
 		field_type := ""

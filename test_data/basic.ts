@@ -95,7 +95,8 @@ export class RPC_Client {
         error: null,
       };
     } catch (error) {
-      console.error(`Error during fetch for ${path}:`, error);
+      console.error('RPC_Client Error for', { path, args: JSON.stringify(args) });
+      console.error(error);
 
       return {
         value: null,
