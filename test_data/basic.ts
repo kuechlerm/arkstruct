@@ -89,9 +89,10 @@ export class RPC_Client {
       }
 
       const data = await result.json();
+      const revived = this.revive_dates(data);
 
       return {
-        value: data as TResponse,
+        value: revived as TResponse,
         error: null,
       };
     } catch (error) {
@@ -103,6 +104,28 @@ export class RPC_Client {
         error: error instanceof Error ? error.message : "Unknown error",
       };
     }
+  }
+
+  revive_dates = <T>(obj: T): T => {
+    const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+
+    if (obj == null || typeof obj !== 'object') return obj;
+
+    if (Array.isArray(obj)) {
+      return obj.map(this.revive_dates) as any;
+    }
+
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (typeof value === 'string' && ISO_DATE_REGEX.test(value)) {
+        result[key] = new Date(value);
+      } else if (typeof value === 'object' && value !== null) {
+        result[key] = this.revive_dates(value);
+      } else {
+        result[key] = value;
+      }
+    }
+    return result;
   }
 
   a_name = (args: A_Name_Request) =>
