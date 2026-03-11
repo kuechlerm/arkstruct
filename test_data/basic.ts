@@ -61,7 +61,7 @@ export class RPC_Client {
       override_call?: (path: string, args: any) => Promise<any>;
       handle_error?: (response: Response) => void;
     },
-  ) {}
+  ) { }
 
   async #call<TRequest, TResponse>(
     path: string,
@@ -80,7 +80,7 @@ export class RPC_Client {
       });
 
       if (!result.ok) {
-        console.error(`Fetch error: ${result.status} ${result.statusText} for ${path}`);
+        console.warn(`Fetch error: ${result.status} ${result.statusText} for ${path}`);
         if (this.options?.handle_error) this.options.handle_error(result);
         return {
           value: null,
@@ -96,8 +96,8 @@ export class RPC_Client {
         error: null,
       };
     } catch (error) {
-      console.error('RPC_Client Error for', { path, args: JSON.stringify(args) });
-      console.error(error);
+      console.warn('RPC_Client Error for', { path, args: JSON.stringify(args) });
+      console.warn(error);
 
       return {
         value: null,
@@ -107,7 +107,7 @@ export class RPC_Client {
   }
 
   revive_dates = <T>(obj: T): T => {
-    const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
+    const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:\d{2}|Z)$/;
 
     if (obj == null || typeof obj !== 'object') return obj;
 
@@ -126,7 +126,7 @@ export class RPC_Client {
       }
     }
     return result;
-  }
+  };
 
   a_name = (args: A_Name_Request) =>
     this.#call<A_Name_Request, A_Name_Response>(A_Name_Path, args);
