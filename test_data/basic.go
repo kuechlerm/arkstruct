@@ -20,6 +20,7 @@ type Eins_Request struct {
 	OptionalInt    int    `json:"optionalInt" ark:"number | undefined"`
 	RequiredBool   bool   `json:"requiredBool" validate:"required" ark:"boolean"`
 	OptionalBool   bool   `json:"optionalBool" ark:"boolean | undefined"`
+	SpecialType     string `json:"specialType" ark:"type:type.or(A_Name_Request_Schema, A_Name_Response_Schema)"`
 }
 
 type Eins_Response struct {

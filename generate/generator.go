@@ -200,7 +200,7 @@ func write_schema(ts_code *strings.Builder, schema Schema) {
 			ts_code.WriteString("\n")
 		}
 		if strings.HasPrefix(prop.Type, "type:") {
-			fmt.Fprintf(ts_code, `  %s: %s,`, prop.Name, strings.TrimLeft(prop.Type, "type:"))
+			fmt.Fprintf(ts_code, `  %s: %s,`, prop.Name, strings.TrimPrefix(prop.Type, "type:"))
 		} else {
 			fmt.Fprintf(ts_code, `  %s: "%s",`, prop.Name, prop.Type)
 		}
@@ -369,7 +369,7 @@ func map_schema(typeSpec *ast.TypeSpec) Schema {
 				if tag.Key == "ark" {
 					// fmt.Printf("Ark tag found: %s\n", tag.Name)
 					// hier wird der Ark-Type gesetzt
-					field_type = tag.Name
+					field_type = tag.Value()
 				}
 
 				// if tag.Key == "validate" {

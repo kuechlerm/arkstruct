@@ -25,6 +25,7 @@ export const Eins_Request_Schema = type({
   optionalInt: "number | undefined",
   requiredBool: "boolean",
   optionalBool: "boolean | undefined",
+  specialType: type.or(A_Name_Request_Schema, A_Name_Response_Schema),
 });
 export type Eins_Request = typeof Eins_Request_Schema.infer;
 

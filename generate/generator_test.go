@@ -56,7 +56,7 @@ import (
 // }
 
 func Test_generate_ts(t *testing.T) {
-	go_content, err := os.ReadFile("../test_data/basic.go")
+		go_content, err := os.ReadFile("../test_data/basic.go")
 	if err != nil {
 		t.Fatalf("Error reading Go file: %v", err)
 	}
