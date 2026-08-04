@@ -112,6 +112,7 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 	ts_code.WriteString("    try {\n")
 	ts_code.WriteString("      const result = await fetch(new URL(path, this.base_url).href, {\n")
 	ts_code.WriteString("        method: \"POST\",\n")
+	ts_code.WriteString("        credentials: \"include\",\n")
 	ts_code.WriteString("        headers: {\n")
 	ts_code.WriteString("          \"Content-Type\": \"application/json\",\n")
 	ts_code.WriteString("        },\n")

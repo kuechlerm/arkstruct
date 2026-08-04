@@ -74,6 +74,7 @@ export class RPC_Client {
     try {
       const result = await fetch(new URL(path, this.base_url).href, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
