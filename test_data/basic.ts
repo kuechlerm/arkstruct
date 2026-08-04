@@ -67,7 +67,7 @@ export class RPC_Client {
   async #call<TRequest, TResponse>(
     path: string,
     args: TRequest,
-  ): Promise<{ value: TResponse; error: null } | { value: null; error: string }> {
+  ): Promise<{ value: TResponse; error: null; status: number } | { value: null; error: string; status: number | null }> {
 
     if (this.options?.override_call) return await this.options.override_call(path, args);
 
@@ -87,6 +87,7 @@ export class RPC_Client {
         return {
           value: null,
           error: (await result.json())?.message ?? 'Unknown error',
+          status: result.status,
         };
       }
 
@@ -96,6 +97,7 @@ export class RPC_Client {
       return {
         value: revived as TResponse,
         error: null,
+        status: result.status,
       };
     } catch (error) {
       console.warn('RPC_Client Error for', { path, args: JSON.stringify(args) });
@@ -104,6 +106,7 @@ export class RPC_Client {
       return {
         value: null,
         error: error instanceof Error ? error.message : "Unknown error",
+        status: null,
       };
     }
   }

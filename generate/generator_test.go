@@ -92,6 +92,31 @@ func Test_generate_ts(t *testing.T) {
 	}
 }
 
+func Test_generate_ts_ist_deterministisch(t *testing.T) {
+	go_content, err := os.ReadFile("../test_data/basic.go")
+	if err != nil {
+		t.Fatalf("Error reading Go file: %v", err)
+	}
+
+	var previous string
+	for i := 0; i < 20; i++ {
+		dtos, rpcs, err := get_infos(string(go_content))
+		if err != nil {
+			t.Fatalf("Error getting RPCs: %v", err)
+		}
+
+		result, err := generate_ts(dtos, rpcs)
+		if err != nil {
+			t.Fatalf("Error generating TS: %v", err)
+		}
+
+		if i > 0 && result != previous {
+			t.Fatalf("generate_ts ist nicht deterministisch (Lauf %d weicht von Lauf %d ab)", i, i-1)
+		}
+		previous = result
+	}
+}
+
 // todo: später implementieren
 // func TestMapValidation(t *testing.T) {
 // 	tests := []struct {

@@ -7,6 +7,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/fatih/structtag"
@@ -107,7 +108,7 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 	ts_code.WriteString("  async #call<TRequest, TResponse>(\n")
 	ts_code.WriteString("    path: string,\n")
 	ts_code.WriteString("    args: TRequest,\n")
-	ts_code.WriteString("  ): Promise<{ value: TResponse; error: null } | { value: null; error: string }> {\n\n")
+	ts_code.WriteString("  ): Promise<{ value: TResponse; error: null; status: number } | { value: null; error: string; status: number | null }> {\n\n")
 	ts_code.WriteString("    if (this.options?.override_call) return await this.options.override_call(path, args);\n\n")
 	ts_code.WriteString("    try {\n")
 	ts_code.WriteString("      const result = await fetch(new URL(path, this.base_url).href, {\n")
@@ -124,6 +125,7 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 	ts_code.WriteString("        return {\n")
 	ts_code.WriteString("          value: null,\n")
 	ts_code.WriteString("          error: (await result.json())?.message ?? 'Unknown error',\n")
+	ts_code.WriteString("          status: result.status,\n")
 	ts_code.WriteString("        };\n")
 	ts_code.WriteString("      }\n\n")
 	ts_code.WriteString("      const data = await result.json();\n")
@@ -131,6 +133,7 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 	ts_code.WriteString("      return {\n")
 	ts_code.WriteString("        value: revived as TResponse,\n")
 	ts_code.WriteString("        error: null,\n")
+	ts_code.WriteString("        status: result.status,\n")
 	ts_code.WriteString("      };\n")
 	ts_code.WriteString("    } catch (error) {\n")
 	ts_code.WriteString("      console.warn('RPC_Client Error for', { path, args: JSON.stringify(args) });\n")
@@ -138,6 +141,7 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 	ts_code.WriteString("      return {\n")
 	ts_code.WriteString("        value: null,\n")
 	ts_code.WriteString("        error: error instanceof Error ? error.message : \"Unknown error\",\n")
+	ts_code.WriteString("        status: null,\n")
 	ts_code.WriteString("      };\n")
 	ts_code.WriteString("    }\n")
 	ts_code.WriteString("  }\n\n")
@@ -313,6 +317,7 @@ func get_infos(file_content string) (DTOs, RPCs, error) {
 		}
 		rpcs = append(rpcs, call)
 	}
+	sort.Slice(rpcs, func(i, j int) bool { return rpcs[i].name < rpcs[j].name })
 
 	return dtos, rpcs, nil
 }
