@@ -58,8 +58,7 @@ export class RPC_Client {
   constructor(
     private base_url: string,
     private options?: {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      override_call?: (path: string, args: any) => Promise<any>;
+      fetch?: (url: string, init: RequestInit) => Promise<Response>;
       handle_error?: (response: Response) => void;
     },
   ) { }
@@ -69,10 +68,10 @@ export class RPC_Client {
     args: TRequest,
   ): Promise<{ value: TResponse; error: null; status: number } | { value: null; error: string; status: number | null }> {
 
-    if (this.options?.override_call) return await this.options.override_call(path, args);
+    const do_fetch = this.options?.fetch ?? globalThis.fetch;
 
     try {
-      const result = await fetch(new URL(path, this.base_url).href, {
+      const result = await do_fetch(new URL(path, this.base_url).href, {
         method: "POST",
         credentials: "include",
         headers: {
