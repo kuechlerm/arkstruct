@@ -60,6 +60,7 @@ export class RPC_Client {
     private options?: {
       fetch?: (url: string, init: RequestInit) => Promise<Response>;
       handle_error?: (response: Response) => void;
+      log?: { warn(meldung: unknown, ...details: unknown[]): void };
     },
   ) { }
 
@@ -69,6 +70,7 @@ export class RPC_Client {
   ): Promise<{ value: TResponse; error: null; status: number } | { value: null; error: string; status: number | null }> {
 
     const do_fetch = this.options?.fetch ?? globalThis.fetch;
+    const do_log = this.options?.log ?? console;
 
     try {
       const result = await do_fetch(new URL(path, this.base_url).href, {
@@ -81,7 +83,7 @@ export class RPC_Client {
       });
 
       if (!result.ok) {
-        console.warn(`Fetch error: ${result.status} ${result.statusText} for ${path}`);
+        do_log.warn(`Fetch error: ${result.status} ${result.statusText} for ${path}`);
         if (this.options?.handle_error) this.options.handle_error(result);
         return {
           value: null,
@@ -99,8 +101,8 @@ export class RPC_Client {
         status: result.status,
       };
     } catch (error) {
-      console.warn('RPC_Client Error for', { path, args: JSON.stringify(args) });
-      console.warn(error);
+      do_log.warn('RPC_Client Error for', { path, args: JSON.stringify(args) });
+      do_log.warn(error);
 
       return {
         value: null,
