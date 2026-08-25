@@ -67,7 +67,7 @@ export class RPC_Client {
   async #call<TRequest, TResponse>(
     path: string,
     args: TRequest,
-  ): Promise<{ value: TResponse; error: null; status: number } | { value: null; error: string; status: number | null }> {
+  ): Promise<{ value: TResponse; error: null; status: number } | { value: null; error: string; status: number | null; body: unknown }> {
 
     const do_fetch = this.options?.fetch ?? globalThis.fetch;
     const do_log = this.options?.log ?? console;
@@ -85,10 +85,12 @@ export class RPC_Client {
       if (!result.ok) {
         do_log.warn(`Fetch error: ${result.status} ${result.statusText} for ${path}`);
         if (this.options?.handle_error) this.options.handle_error(result);
+        const fehler_body = this.revive_dates(await result.json().catch(() => null));
         return {
           value: null,
-          error: (await result.json())?.message ?? 'Unknown error',
+          error: (fehler_body as { message?: string } | null)?.message ?? 'Unknown error',
           status: result.status,
+          body: fehler_body,
         };
       }
 
@@ -108,6 +110,7 @@ export class RPC_Client {
         value: null,
         error: error instanceof Error ? error.message : "Unknown error",
         status: null,
+        body: null,
       };
     }
   }
