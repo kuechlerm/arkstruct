@@ -103,7 +103,7 @@ export class RPC_Client {
         status: result.status,
       };
     } catch (error) {
-      do_log.warn('RPC_Client Error for', { path, args: JSON.stringify(args) });
+      do_log.warn(`RPC_Client Error for ${path}`);
       do_log.warn(error);
 
       return {

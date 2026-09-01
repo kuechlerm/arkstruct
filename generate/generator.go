@@ -139,7 +139,10 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 	ts_code.WriteString("        status: result.status,\n")
 	ts_code.WriteString("      };\n")
 	ts_code.WriteString("    } catch (error) {\n")
-	ts_code.WriteString("      do_log.warn('RPC_Client Error for', { path, args: JSON.stringify(args) });\n")
+	// Die Aufrufargumente gehen bewusst nicht ins Log: sie tragen bei `nutzer_login` das
+	// Klartext-Passwort und bei `push_changes` Gesundheitsdaten, und dieser catch-Zweig laeuft
+	// bei jedem Offline-Aufruf. Siehe ADR-0025 §3 im Physication-Repo.
+	ts_code.WriteString("      do_log.warn(`RPC_Client Error for ${path}`);\n")
 	ts_code.WriteString("      do_log.warn(error);\n\n")
 	ts_code.WriteString("      return {\n")
 	ts_code.WriteString("        value: null,\n")
