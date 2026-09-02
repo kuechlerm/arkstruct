@@ -3,8 +3,14 @@ import { type } from "arktype";
 export const Ding_DTO_Schema = type({
   id: "number",
   name: "string > 0",
+  angelegt: "string.date.iso.parse",
 });
 export type Ding_DTO = typeof Ding_DTO_Schema.infer;
+
+export const Nur_Request_DTO_Schema = type({
+  wann: "Date",
+});
+export type Nur_Request_DTO = typeof Nur_Request_DTO_Schema.infer;
 
 export const A_Name_Path = "/a_name";
 export const A_Name_Request_Schema = type({
@@ -31,6 +37,9 @@ export type Eins_Request = typeof Eins_Request_Schema.infer;
 
 export const Eins_Response_Schema = type({
   responseString: "string > 0",
+  zeitpunkt: "string.date.iso.parse",
+  vielleicht: "string.date.iso.parse?",
+  oderNull: "string.date.iso.parse | null",
 });
 export type Eins_Response = typeof Eins_Response_Schema.infer;
 
@@ -46,6 +55,7 @@ export type Listen_Response = typeof Listen_Response_Schema.infer;
 export const Zwei_Path = "/zwei";
 export const Zwei_Request_Schema = type({
   optionalString: "string | undefined",
+  nurRequest: Nur_Request_DTO_Schema,
 });
 export type Zwei_Request = typeof Zwei_Request_Schema.infer;
 
@@ -67,6 +77,7 @@ export class RPC_Client {
   async #call<TRequest, TResponse>(
     path: string,
     args: TRequest,
+    schema: (data: unknown) => unknown,
   ): Promise<{ value: TResponse; error: null; status: number } | { value: null; error: string; status: number | null; body: unknown }> {
 
     const do_fetch = this.options?.fetch ?? globalThis.fetch;
@@ -85,7 +96,7 @@ export class RPC_Client {
       if (!result.ok) {
         do_log.warn(`Fetch error: ${result.status} ${result.statusText} for ${path}`);
         if (this.options?.handle_error) this.options.handle_error(result);
-        const fehler_body = this.revive_dates(await result.json().catch(() => null));
+        const fehler_body = await result.json().catch(() => null);
         return {
           value: null,
           error: (fehler_body as { message?: string } | null)?.message ?? 'Unknown error',
@@ -94,11 +105,22 @@ export class RPC_Client {
         };
       }
 
-      const data = await result.json();
-      const revived = this.revive_dates(data);
+      const geprueft = schema(await result.json());
+
+      if (geprueft instanceof type.errors) {
+        const stellen = geprueft.map((fehler) => `${fehler.path.join(".")} erwartet ${fehler.expected}`).join("; ");
+        do_log.warn(`Antwort verletzt Vertrag: ${path} — ${stellen}`);
+
+        return {
+          value: null,
+          error: "Antwort verletzt den Vertrag",
+          status: null,
+          body: null,
+        };
+      }
 
       return {
-        value: revived as TResponse,
+        value: geprueft as TResponse,
         error: null,
         status: result.status,
       };
@@ -115,37 +137,15 @@ export class RPC_Client {
     }
   }
 
-  revive_dates = <T>(obj: T): T => {
-    const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:\d{2}|Z)$/;
-
-    if (obj == null || typeof obj !== 'object') return obj;
-
-    if (Array.isArray(obj)) {
-      return obj.map(this.revive_dates) as any;
-    }
-
-    const result: any = {};
-    for (const [key, value] of Object.entries(obj)) {
-      if (typeof value === 'string' && ISO_DATE_REGEX.test(value)) {
-        result[key] = new Date(value);
-      } else if (typeof value === 'object' && value !== null) {
-        result[key] = this.revive_dates(value);
-      } else {
-        result[key] = value;
-      }
-    }
-    return result;
-  };
-
   a_name = (args: A_Name_Request) =>
-    this.#call<A_Name_Request, A_Name_Response>(A_Name_Path, args);
+    this.#call<A_Name_Request, A_Name_Response>(A_Name_Path, args, A_Name_Response_Schema);
 
   eins = (args: Eins_Request) =>
-    this.#call<Eins_Request, Eins_Response>(Eins_Path, args);
+    this.#call<Eins_Request, Eins_Response>(Eins_Path, args, Eins_Response_Schema);
 
   listen = (args: Listen_Request) =>
-    this.#call<Listen_Request, Listen_Response>(Listen_Path, args);
+    this.#call<Listen_Request, Listen_Response>(Listen_Path, args, Listen_Response_Schema);
 
   zwei = (args: Zwei_Request) =>
-    this.#call<Zwei_Request, Zwei_Response>(Zwei_Path, args);
+    this.#call<Zwei_Request, Zwei_Response>(Zwei_Path, args, Zwei_Response_Schema);
 }

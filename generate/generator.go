@@ -7,6 +7,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -84,14 +85,16 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 	ts_code.WriteString(`import { type } from "arktype";`)
 	ts_code.WriteString("\n\n")
 
+	geprueft := gepruefte_schemas(dtos, rpcs)
+
 	for _, dto := range dtos {
-		write_schema(ts_code, dto)
+		write_schema(ts_code, dto, geprueft[dto.Name])
 	}
 
 	for _, rpc := range rpcs {
 		write_path(ts_code, rpc.name, rpc.path)
-		write_schema(ts_code, rpc.request)
-		write_schema(ts_code, rpc.response)
+		write_schema(ts_code, rpc.request, geprueft[rpc.request.Name])
+		write_schema(ts_code, rpc.response, geprueft[rpc.response.Name])
 	}
 
 	// rpc client class
@@ -108,6 +111,7 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 	ts_code.WriteString("  async #call<TRequest, TResponse>(\n")
 	ts_code.WriteString("    path: string,\n")
 	ts_code.WriteString("    args: TRequest,\n")
+	ts_code.WriteString("    schema: (data: unknown) => unknown,\n")
 	ts_code.WriteString("  ): Promise<{ value: TResponse; error: null; status: number } | { value: null; error: string; status: number | null; body: unknown }> {\n\n")
 	ts_code.WriteString("    const do_fetch = this.options?.fetch ?? globalThis.fetch;\n")
 	ts_code.WriteString("    const do_log = this.options?.log ?? console;\n\n")
@@ -123,7 +127,9 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 	ts_code.WriteString("      if (!result.ok) {\n")
 	ts_code.WriteString("        do_log.warn(`Fetch error: ${result.status} ${result.statusText} for ${path}`);\n")
 	ts_code.WriteString("        if (this.options?.handle_error) this.options.handle_error(result);\n")
-	ts_code.WriteString("        const fehler_body = this.revive_dates(await result.json().catch(() => null));\n")
+	// Der Fehlerkoerper folgt dem Fehlermodell, nicht dem Response-Schema, und wird ungeprueft und
+	// unveraendert durchgereicht (ADR-0035 §6 im Physication-Repo).
+	ts_code.WriteString("        const fehler_body = await result.json().catch(() => null);\n")
 	ts_code.WriteString("        return {\n")
 	ts_code.WriteString("          value: null,\n")
 	ts_code.WriteString("          error: (fehler_body as { message?: string } | null)?.message ?? 'Unknown error',\n")
@@ -131,10 +137,24 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 	ts_code.WriteString("          body: fehler_body,\n")
 	ts_code.WriteString("        };\n")
 	ts_code.WriteString("      }\n\n")
-	ts_code.WriteString("      const data = await result.json();\n")
-	ts_code.WriteString("      const revived = this.revive_dates(data);\n\n")
+	ts_code.WriteString("      const geprueft = schema(await result.json());\n\n")
+	// Gemeldet werden Pfad und erwarteter Typ, nie der vorgefundene Wert: `actual`, `summary` und
+	// `message` tragen ihn (ADR-0025 §3 im Physication-Repo). Eine Verletzung kommt als unlesbare
+	// Antwort zurueck - `status: null` wie bei einer Antwort, die nie zustande kam (ADR-0035 §3).
+	ts_code.WriteString("      if (geprueft instanceof type.errors) {\n")
+	ts_code.WriteString("        const stellen = geprueft.map((fehler) => `${fehler.path.join(\".\")} erwartet ${fehler.expected}`).join(\"; \");\n")
+	ts_code.WriteString("        do_log.warn(`Antwort verletzt Vertrag: ${path} — ${stellen}`);\n\n")
+	ts_code.WriteString("        return {\n")
+	ts_code.WriteString("          value: null,\n")
+	ts_code.WriteString("          error: \"Antwort verletzt den Vertrag\",\n")
+	ts_code.WriteString("          status: null,\n")
+	ts_code.WriteString("          body: null,\n")
+	ts_code.WriteString("        };\n")
+	ts_code.WriteString("      }\n\n")
+	// Der Rueckgabewert ist das Ergebnis des Schemas, nicht die rohe Antwort - nur so wirken die
+	// Datums-Morphs aus map_date_tag.
 	ts_code.WriteString("      return {\n")
-	ts_code.WriteString("        value: revived as TResponse,\n")
+	ts_code.WriteString("        value: geprueft as TResponse,\n")
 	ts_code.WriteString("        error: null,\n")
 	ts_code.WriteString("        status: result.status,\n")
 	ts_code.WriteString("      };\n")
@@ -152,25 +172,6 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 	ts_code.WriteString("      };\n")
 	ts_code.WriteString("    }\n")
 	ts_code.WriteString("  }\n\n")
-	ts_code.WriteString("  revive_dates = <T>(obj: T): T => {\n")
-	ts_code.WriteString(`    const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:\d{2}|Z)$/;`)
-	ts_code.WriteString("\n\n")
-	ts_code.WriteString("    if (obj == null || typeof obj !== 'object') return obj;\n\n")
-	ts_code.WriteString("    if (Array.isArray(obj)) {\n")
-	ts_code.WriteString("      return obj.map(this.revive_dates) as any;\n")
-	ts_code.WriteString("    }\n\n")
-	ts_code.WriteString("    const result: any = {};\n")
-	ts_code.WriteString("    for (const [key, value] of Object.entries(obj)) {\n")
-	ts_code.WriteString("      if (typeof value === 'string' && ISO_DATE_REGEX.test(value)) {\n")
-	ts_code.WriteString("        result[key] = new Date(value);\n")
-	ts_code.WriteString("      } else if (typeof value === 'object' && value !== null) {\n")
-	ts_code.WriteString("        result[key] = this.revive_dates(value);\n")
-	ts_code.WriteString("      } else {\n")
-	ts_code.WriteString("        result[key] = value;\n")
-	ts_code.WriteString("      }\n")
-	ts_code.WriteString("    }\n")
-	ts_code.WriteString("    return result;\n")
-	ts_code.WriteString("  };\n\n")
 
 	for idx, rpc := range rpcs {
 		trenner_index := strings.LastIndex(rpc.request.Name, "_")
@@ -188,7 +189,7 @@ func generate_ts(dtos DTOs, rpcs RPCs) (string, error) {
 				rpc.request.Name +
 				", " +
 				rpc.response.Name +
-				">(" + rpc.name + "_Path, args);\n")
+				">(" + rpc.name + "_Path, args, " + rpc.response.Name + "_Schema);\n")
 
 		if idx < len(rpcs)-1 {
 			ts_code.WriteString("\n")
@@ -204,17 +205,21 @@ func write_path(ts_code *strings.Builder, name string, path string) {
 	fmt.Fprintf(ts_code, "export const %s_Path = \"%s\";\n", name, path)
 }
 
-func write_schema(ts_code *strings.Builder, schema Schema) {
+func write_schema(ts_code *strings.Builder, schema Schema, geprueft bool) {
 	fmt.Fprintf(ts_code, "export const %s_Schema = type({", schema.Name)
 
 	for idx, prop := range schema.Properties {
 		if idx == 0 {
 			ts_code.WriteString("\n")
 		}
-		if strings.HasPrefix(prop.Type, "type:") {
-			fmt.Fprintf(ts_code, `  %s: %s,`, prop.Name, strings.TrimPrefix(prop.Type, "type:"))
+		typ := prop.Type
+		if geprueft {
+			typ = map_date_tag(typ)
+		}
+		if strings.HasPrefix(typ, "type:") {
+			fmt.Fprintf(ts_code, `  %s: %s,`, prop.Name, strings.TrimPrefix(typ, "type:"))
 		} else {
-			fmt.Fprintf(ts_code, `  %s: "%s",`, prop.Name, prop.Type)
+			fmt.Fprintf(ts_code, `  %s: "%s",`, prop.Name, typ)
 		}
 		ts_code.WriteString("\n")
 	}
@@ -414,6 +419,66 @@ func map_schema(typeSpec *ast.TypeSpec) Schema {
 	return Schema{
 		Name:       typeSpec.Name.Name,
 		Properties: properties,
+	}
+}
+
+// gepruefte_schemas nennt die Schemas, die zur Laufzeit wirklich durchlaufen werden: jede
+// *_Response und alles, was von ihr aus erreichbar ist. Nur dort wird aus `Date` eine Morph.
+//
+// Ein Request-Schema bekommt sie nicht. Es wird nie ausgefuehrt - und eine Morph in einer
+// unsortierten Union (`type.or(...)`, wie im Payload von Push_Changes) macht die Union fuer
+// arktype unbestimmt und bricht schon beim Laden des Moduls.
+func gepruefte_schemas(dtos DTOs, rpcs RPCs) map[string]bool {
+	nach_name := map[string]Schema{}
+	for _, dto := range dtos {
+		nach_name[dto.Name] = dto
+	}
+	for _, rpc := range rpcs {
+		nach_name[rpc.response.Name] = rpc.response
+	}
+
+	geprueft := map[string]bool{}
+	var lauf func(string)
+	lauf = func(name string) {
+		if geprueft[name] {
+			return
+		}
+		geprueft[name] = true
+		for _, prop := range nach_name[name].Properties {
+			for _, referenz := range referenzierte_schemas(prop.Type) {
+				lauf(referenz)
+			}
+		}
+	}
+	for _, rpc := range rpcs {
+		lauf(rpc.response.Name)
+	}
+
+	return geprueft
+}
+
+// referenzierte_schemas liest aus einem `type:`-Tag die Namen der Schemas heraus, auf die er sich
+// beruft - egal ob `Ding_DTO_Schema.array()` oder `type.or(A_Schema, B_Schema)`.
+func referenzierte_schemas(ark_tag string) []string {
+	return schema_referenz.FindAllString(ark_tag, -1)
+}
+
+var schema_referenz = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*(?:_DTO|_Response)`)
+
+// map_date_tag bildet die drei Datums-Tags auf die arktype-Morph ab, die den ISO-String beim
+// Pruefen in ein Date ueberfuehrt. Der Go-Tag bleibt lesbar `Date`, der abgeleitete
+// TypeScript-Typ bleibt `Date` - die Umwandlung passiert genau an den deklarierten Stellen und
+// sonst nirgends. Jeder andere Tag geht unveraendert durch.
+func map_date_tag(ark_tag string) string {
+	switch ark_tag {
+	case "Date":
+		return "string.date.iso.parse"
+	case "Date?":
+		return "string.date.iso.parse?"
+	case "Date | null":
+		return "string.date.iso.parse | null"
+	default:
+		return ark_tag
 	}
 }
 

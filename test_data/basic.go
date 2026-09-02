@@ -1,5 +1,7 @@
 package test_data
 
+import "time"
+
 const A_Name_Path = "/a_name"
 
 type (
@@ -20,11 +22,14 @@ type Eins_Request struct {
 	OptionalInt    int    `json:"optionalInt" ark:"number | undefined"`
 	RequiredBool   bool   `json:"requiredBool" validate:"required" ark:"boolean"`
 	OptionalBool   bool   `json:"optionalBool" ark:"boolean | undefined"`
-	SpecialType     string `json:"specialType" ark:"type:type.or(A_Name_Request_Schema, A_Name_Response_Schema)"`
+	SpecialType    string `json:"specialType" ark:"type:type.or(A_Name_Request_Schema, A_Name_Response_Schema)"`
 }
 
 type Eins_Response struct {
-	ResponseString string `json:"responseString" validate:"required" ark:"string > 0"`
+	ResponseString string     `json:"responseString" validate:"required" ark:"string > 0"`
+	Zeitpunkt      time.Time  `json:"zeitpunkt" ark:"Date"`
+	Vielleicht     *time.Time `json:"vielleicht" ark:"Date?"`
+	OderNull       *time.Time `json:"oderNull" ark:"Date | null"`
 }
 
 const (
@@ -34,8 +39,9 @@ const (
 
 type (
 	Ding_DTO struct {
-		ID   int    `json:"id" ark:"number"`
-		Name string `json:"name" ark:"string > 0"`
+		ID       int       `json:"id" ark:"number"`
+		Name     string    `json:"name" ark:"string > 0"`
+		Angelegt time.Time `json:"angelegt" ark:"Date"`
 	}
 	// Ding_DTO struct {
 	// 	Ding
@@ -46,8 +52,15 @@ type (
 	}
 )
 
+// Nur_Request_DTO haengt an keiner Response. Sein Datumsfeld bleibt deshalb `Date` - die Morph
+// gehoert nur an Schemas, die zur Laufzeit wirklich durchlaufen werden.
+type Nur_Request_DTO struct {
+	Wann time.Time `json:"wann" ark:"Date"`
+}
+
 type Zwei_Request struct {
-	OptionalString string `json:"optionalString" ark:"string | undefined"`
+	OptionalString string          `json:"optionalString" ark:"string | undefined"`
+	Nur_Request    Nur_Request_DTO `json:"nurRequest" ark:"type:Nur_Request_DTO_Schema"`
 }
 
 type Zwei_Response struct {
